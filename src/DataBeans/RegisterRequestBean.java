@@ -15,8 +15,8 @@ public class RegisterRequestBean implements JsonToObject {
 
     @Override
     public void convertFromJson(String jsonData) {
-        JSONObject jsonObj = new JSONObject();
-        userName = jsonObj.getString("userName");
+        JSONObject jsonObj = JSONObject.fromObject(jsonData);
+        userName = jsonObj.getString("username");
         pwd = jsonObj.getString("pwd");
     }
 }

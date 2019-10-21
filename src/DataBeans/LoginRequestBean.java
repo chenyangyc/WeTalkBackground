@@ -15,8 +15,8 @@ public class LoginRequestBean implements JsonToObject {
 
     @Override
     public void convertFromJson(String jsonData) {
-        JSONObject jsonObj = new JSONObject(jsonData);
-        userName = jsonObj.getString("userName");
+        JSONObject jsonObj = JSONObject.fromObject(jsonData);
+        userName = jsonObj.getString("username");
         pwd = jsonObj.getString("pwd");
     }
 }
