@@ -3,10 +3,10 @@ package DataBeans;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
-import java.util.List;
+import java.util.ArrayList;
 
 public class FriendsResponseBean extends CommonResponseBean implements ObjectToJson {
-    public List<String> friendsList;
+    public ArrayList<String> friendsList;
 
     @Override
     public String convertFromObject() {
@@ -14,9 +14,9 @@ public class FriendsResponseBean extends CommonResponseBean implements ObjectToJ
         JSONArray jsonArray = new JSONArray();
         solveWith(jsonObj);
         for(String str: friendsList) {
-            jsonArray.put(friendsList);
+            jsonArray.put(str);
         }
-        jsonObj.put("friends", friendsList);
+        jsonObj.put("friends", jsonArray);
         return jsonObj.toString();
     }
 }

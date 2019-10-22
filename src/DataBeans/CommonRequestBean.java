@@ -20,7 +20,7 @@ public class CommonRequestBean implements JsonToObject {
     @Override
     public void convertFromJson(String jsonData) {
         JSONObject jsonObj = JSONObject.fromObject(jsonData);
-        userName = jsonObj.getString("userName");
+        userName = jsonObj.getString("username");
         token = jsonObj.getInt("token");
     }
 }

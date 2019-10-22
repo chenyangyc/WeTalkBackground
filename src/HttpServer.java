@@ -4,16 +4,15 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.*;
-import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 
 public class HttpServer {
-    Map<Integer, ServerSocket> userMap;
+    Map<Integer, Socket> userMap = new HashMap<>();
     Connection connection;
     Statement statement;
     ServerSocket server;               //本服务器
     Socket client;                     //发请求的客户端
+    int id = 0;
     String commonMSG = "HTTP/1.1 %code %msg\r\n" +
 						"Content-Type: application/json;charset=utf-8\r\n" +
                         "Connection: keep-alive\r\n" +
@@ -68,37 +67,34 @@ public class HttpServer {
                 System.out.println(requestPath);
                 System.out.println(requestBody);
                 if(requestType.equals("POST"))
-                    post(server, requestPath, requestBody);
+                    post(client, requestPath, requestBody);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void post(ServerSocket server, String path, String body){
+    private void post(Socket client, String path, String body){
         if(path.equals("login")) {
-            int id = 0;
             LoginRequestBean loginRequestBean = new LoginRequestBean();
             LoginResponseBean responseBean = new LoginResponseBean();
             loginRequestBean.convertFromJson(body);
-            int c = login(loginRequestBean.getUserName(), loginRequestBean.getPwd(), responseBean.token, id);
-
-            responseBean.setCode(c);
+            Tuple resTuple = login(loginRequestBean.getUserName(), loginRequestBean.getPwd(), responseBean.token);
+            int c = (int)resTuple.code;
+            responseBean.setCode((int)resTuple.code);
+            responseBean.token = (int)resTuple.token;
             responseBean.setType("login");
             if(c == 0) {
                 responseBean.setMsg("OK");
-                addOnlineUser(id, server);  //添加这个socket
+                addOnlineUser(id, client);  //添加这个socket
             }
             else if(c == 1) responseBean.setMsg("密码错误");
             else if(c == -1) responseBean.setMsg("此用户尚未注册");
             else if(c == 2) {
                 responseBean.setMsg("该用户已经在线");
-//                gankIDFromTree(id);//去除之前的socket
-//                insOnlineUser(id, socket);
             }
-            loginRequestBean.convertFromJson(body);
             System.out.println(responseBean.convertFromObject());
-            response(responseBean.convertFromObject());
+            response(client, responseBean.convertFromObject());
         }
         else if(path.equals("register")) {
             RegisterRequestBean registerRequestBean = new RegisterRequestBean();
@@ -110,7 +106,7 @@ public class HttpServer {
             if(c == -1) commonResponseBean.setMsg("重复的用户名");
             else commonResponseBean.setMsg("注册成功");
             System.out.println(commonResponseBean.convertFromObject());
-            response(commonResponseBean.convertFromObject());
+            response(client, commonResponseBean.convertFromObject());
         }
         else if(path.equals("logout")) {
             CommonRequestBean  logoutRequest = new CommonRequestBean();
@@ -122,9 +118,10 @@ public class HttpServer {
             if(c == 1) logoutResponse.setMsg("已经离线");
             else if(c == 2) logoutResponse.setMsg("token无效");
             else if(c == -1)    logoutResponse.setMsg("用户不存在");
-            response(logoutResponse.convertFromObject());
+            System.out.println(logoutResponse.convertFromObject());
+            response(client, logoutResponse.convertFromObject());
             try {
-                server.close();
+                client.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -133,11 +130,13 @@ public class HttpServer {
             CommonRequestBean friendRequest = new CommonRequestBean();
             FriendsResponseBean friendsResponse = new FriendsResponseBean();
             friendRequest.convertFromJson(body);
-            int c = getFriends(friendRequest.getUserName(), friendRequest.getToken(), friendsResponse.friendsList);
+            int c = (int)getFriends(friendRequest.getUserName(), friendRequest.getToken()).code;
             if(c == 0) friendsResponse.setMsg("OK");
             else if(c == -1) friendsResponse.setMsg("用户不存在");
             else if(c == 1) friendsResponse.setMsg("token无效");
-            response(friendsResponse.convertFromObject());
+            friendsResponse.friendsList = (ArrayList)getFriends(friendRequest.getUserName(), friendRequest.getToken()).token;
+            System.out.println(friendsResponse.convertFromObject());
+            response(client, friendsResponse.convertFromObject());
         }
 
         else if (path.equals("makefriends")) {
@@ -153,14 +152,15 @@ public class HttpServer {
             else if(c == 2) makeFriendsResponse.setMsg("已经是好友了");
             else if(c == 3) makeFriendsResponse.setMsg("目标用户不存在");
             else if(c == -2) makeFriendsResponse.setMsg("目标用户不在线");
-            response(makeFriendsResponse.convertFromObject());
+            System.out.println(makeFriendsResponse.convertFromObject());
+            response(client, makeFriendsResponse.convertFromObject());
         }
 
         else if(path.equals("result")) {
             ResultRequestBean resultRequest = new ResultRequestBean();
             CommonResponseBean commonResponse = new CommonResponseBean();
             resultRequest.convertFromJson(body);
-            int c = makeFriendsCheck(resultRequest.getUserName(), resultRequest.getTo(), resultRequest.getToken(), resultRequest.getStatus());
+            int c = makeFriendsCheck(resultRequest.getFrom(), resultRequest.getTo(), resultRequest.getToken(), resultRequest.getStatus());
             commonResponse.setCode(c);
             commonResponse.setType("result");
             if(c == 0) {
@@ -172,7 +172,8 @@ public class HttpServer {
             else if(c == 2) commonResponse.setMsg("已经是好友了");
             else if(c == 3) commonResponse.setMsg("目标用户不存在");
             else if(c == -2) commonResponse.setMsg("目标用户不在线");
-            response(commonResponse.convertFromObject());
+            System.out.println(commonResponse.convertFromObject());
+            response(client, commonResponse.convertFromObject());
         }
 
         else if(path.equals("sendmsg")) {
@@ -187,13 +188,13 @@ public class HttpServer {
             else if(c == 1) response.setMsg("token无效");
             else if(c == 2) response.setMsg("没有这个好友");
             else if(c == -2) response.setMsg("当前用户不在线");
-            response(response.convertFromObject());
+            System.out.println(response.convertFromObject());
+            response(client, response.convertFromObject());
         }
     }
 
-    private void response(String json) {
+    private void response(Socket client, String json) {
         try {
-            client = this.server.accept();
             String result = commonMSG.replaceAll("%code", "200").replaceAll("%msg", "OK")
                     .replaceAll("%type_body", json) + json;
             OutputStream out = client.getOutputStream();
@@ -211,7 +212,7 @@ public class HttpServer {
             else {
                 resultSet = statement.executeQuery("SELECT max(ID) FROM UserData");
                 resultSet.first();
-                int id = resultSet.getInt(1) + 1;
+                id = resultSet.getInt(1) + 1;
                 statement.executeUpdate("INSERT INTO UserData VALUES('"+userName+"', '"+id+"', '"+pwd+"',0,0)");
                 return 0;
             }
@@ -222,29 +223,31 @@ public class HttpServer {
     }
 
     //login返回0表示ok，返回-1表示无用户，返回1表示密码错误，2表示已经上线了
-    private int login(String userName, String pwd, int token, int id) {
-        char[] name = userName.toCharArray();
+    private Tuple login(String userName, String pwd, int token) {
         String sql = "SELECT * FROM UserData WHERE userdata.username = '"+userName+"'";
         try {
             ResultSet resultSet = statement.executeQuery(sql);
             if(resultSet.next()) {
-                if(!resultSet.getString(3).equals(pwd)) return 1;
+                if(!resultSet.getString(3).trim().equals(pwd))
+                    return new Tuple(1,0);
                 else if(resultSet.getInt(4) == 1) {
                     id = resultSet.getInt(2);
-                    return 2;
+                    token = (int)(Math.random() * 100);
+                    String loginSql = "UPDATE UserData SET isOnline = 1, token = '"+token+"' WHERE userName = '"+userName+"'";
+                    statement.executeUpdate(loginSql);
+                    return new Tuple(2, token);
                 } else {
                     id = resultSet.getInt(2);
                     token = (int)(Math.random() * 100);
-                    String loginSql = "UPDATE UserData SET" +
-                                        "isOnline = 1, token = '"+token+"'" +
-                                        "WHERE userName = '"+userName+"')";
-                    return 0;
+                    String loginSql = "UPDATE UserData SET isOnline = 1, token = '"+token+"' WHERE userName = '"+userName+"'";
+                    statement.executeUpdate(loginSql);
+                    return new Tuple(0, token);
                 }
-            } else  return -1;
+            } else  return new Tuple(-1, token);
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return -1;
+        return new Tuple(-1, token);
     }
 
     private int logout(String userName, int token) {
@@ -266,33 +269,34 @@ public class HttpServer {
         return 0;
     }
 
-    private int getFriends(String userName, int token, List<String> friendsList) {
+    private Tuple getFriends(String userName, int token) {
         try {
+            ArrayList<String> friendsList = new ArrayList<>();
             ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userdata.username = '"+userName+"'");
             if(resultSet.next()) {
-                if(resultSet.getInt(5) != token)    return 1;  //wrong token
+                if(resultSet.getInt(5) != token)    return new Tuple(1, friendsList);  //wrong token
                 ResultSet resultSet1 = statement.executeQuery("SELECT friendName FROM UserFriends WHERE userName = '"+userName+"'");
                 while (resultSet1.next()) {
-                    friendsList.add(resultSet1.getNString(1));
+                    friendsList.add(resultSet1.getString(1));
                 }
-                return 0;
-            } else return -1;   //no such user
+                return new Tuple(0, friendsList);
+            } else return new Tuple(-1, friendsList);   //no such user
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return 0;
+        return new Tuple(-1, 0);
     }
 
     private int makeFriends(String userName, String newFriend, int token){
         try {
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+userName+"'");
+            ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userdata.userName = '"+userName+"'");
             if(resultSet.next()) {
                 if(resultSet.getInt(5) != token)    return 1;  //wrong token
                 ResultSet resultSet1 = statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+newFriend+"'");
                 if(resultSet1.next())   return 2;   //already friends
-                ResultSet resultSet2 = statement.executeQuery("SELECT ID FROM UserData WHERE userName = '"+newFriend+"'");
+                ResultSet resultSet2 = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+newFriend+"'");
                 if(resultSet2.next()) {
-                    ServerSocket ss = userMap.get(resultSet2.getInt(2));
+                    Socket ss = userMap.get(resultSet2.getInt(2));
                     if(ss == null)  return -2;  //offline user
                     sendFriendResquest(ss, userName);
                     return 0;
@@ -304,13 +308,13 @@ public class HttpServer {
         return 0;
     }
 
-    private void sendFriendResquest(ServerSocket s, String userName) {
+    private void sendFriendResquest(Socket s, String userName) {
         MakeFriendsResponseBean makeFriendsResponse = new MakeFriendsResponseBean();
         makeFriendsResponse.setCode(0);
         makeFriendsResponse.setMsg("好友请求");
         makeFriendsResponse.setType("friendrequest");
         makeFriendsResponse.from = userName;
-        response(makeFriendsResponse.convertFromObject());
+        response(s, makeFriendsResponse.convertFromObject());
     }
 
     private int makeFriendsCheck(String userName, String newFriend, int token, int status) {
@@ -320,9 +324,9 @@ public class HttpServer {
                 if(resultSet.getInt(5) != token)    return 1;  //wrong token
                 ResultSet resultSet1 = statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+newFriend+"'");
                 if(resultSet1.next())   return 2;
-                ResultSet resultSet2 = statement.executeQuery("SELECT ID FROM UserData WHERE userName = '"+newFriend+"'");
+                ResultSet resultSet2 = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+newFriend+"'");
                 if(resultSet2.next()) {
-                    ServerSocket ss = userMap.get(resultSet2.getInt(2));
+                    Socket ss = userMap.get(resultSet2.getInt(2));
                     if(ss == null)  return -2;  //offline user
                     sendResquestRes(ss, userName, status);
                     return 0;
@@ -334,21 +338,21 @@ public class HttpServer {
         return -1;
     }
 
-    private void sendResquestRes(ServerSocket serverSocket, String from, int status) {
+    private void sendResquestRes(Socket clientSocket, String from, int status) {
         CommonResponseBean commonResponse = new CommonResponseBean();
         commonResponse.setCode(status);
         commonResponse.setMsg(from);
         commonResponse.setType("makefriendsres");
-        response(commonResponse.convertFromObject());
-
+        System.out.println(commonResponse.convertFromObject());
+        response(clientSocket, commonResponse.convertFromObject());
     }
 
     private void addFriend(String from, String to) {
         try {
-            ResultSet resultSet = statement.executeQuery("SELECT MAX(ID) FROM UserFriends");
+            ResultSet resultSet = statement.executeQuery("SELECT MAX(id) FROM UserFriends");
             resultSet.first();
-            int id = resultSet.getInt(2);
-            statement.executeUpdate("INSERT INTO UserFriends VALUES('"+from+"','"+to+"','"+id + 1+"')");
+            int id = resultSet.getInt(1);
+            statement.executeUpdate("INSERT INTO UserFriends VALUES('"+from+"','"+to+"','"+id + 1 +"')");
             statement.executeUpdate("INSERT INTO UserFriends VALUES('"+to+"','"+from+"','"+id + 2 +"')");
         } catch (SQLException e) {
             e.printStackTrace();
@@ -365,7 +369,7 @@ public class HttpServer {
                 if(resultSet1.next()) {
                     ResultSet resultSet2 = statement.executeQuery("SELECT ID FROM UserData WHERE userName = '"+to+"'");
                     resultSet2.first();
-                    ServerSocket ss = userMap.get(resultSet2.getInt(2));
+                    Socket ss = userMap.get(resultSet2.getInt(1));
                     if(ss == null)  return -2;  //offline user
                     sendTo(ss, userName, msg);
                     return 0;
@@ -377,19 +381,20 @@ public class HttpServer {
         return -1;
     }
 
-    private void sendTo(ServerSocket serverSocket, String from, String msg) {
+    private void sendTo(Socket clientSocket, String from, String msg) {
         MakeFriendsResponseBean response = new MakeFriendsResponseBean();
         response.setCode(0);
         response.setMsg(msg);
         response.setType("msg");
         response.from = from;
-        response(response.convertFromObject());
+        System.out.println(response.convertFromObject());
+        response(clientSocket, response.convertFromObject());
     }
 
-    private void addOnlineUser(int id, ServerSocket serverSocket) {
+    private void addOnlineUser(int id, Socket clientSocket) {
+        userMap.put(id, clientSocket);
         System.out.println("新登入用户id：" + id);
-        System.out.println("当前用户数量: " + userMap.size() + 1);
-        userMap.put(id, serverSocket);
+        System.out.println("当前用户数量: " + userMap.size());
     }
 
 
@@ -426,7 +431,7 @@ public class HttpServer {
 
             statement.executeUpdate(sqlUser);
             statement.executeUpdate(sqlRlsp);
-
+            statement.executeUpdate("UPDATE UserData SET isOnline = 0");
         }catch(Exception e){
             throw new RuntimeException(e);
         }
