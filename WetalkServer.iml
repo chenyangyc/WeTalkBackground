@@ -10,7 +10,7 @@
     <orderEntry type="module-library" exported="">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/Desktop/json_all-master/json_all-master/commons-beanutils.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../IntelliJIdeaFiles/commons-beanutils.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -19,7 +19,7 @@
     <orderEntry type="module-library" exported="">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/Desktop/json_all-master/json_all-master/commons-collections-3.0.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../IntelliJIdeaFiles/commons-collections-3.0.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -28,7 +28,7 @@
     <orderEntry type="module-library" exported="">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/Desktop/json_all-master/json_all-master/commons-lang-2.1.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../IntelliJIdeaFiles/commons-lang-2.1.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -37,7 +37,7 @@
     <orderEntry type="module-library" exported="">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/Desktop/json_all-master/json_all-master/ezmorph-1.0.2.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../IntelliJIdeaFiles/commons-logging.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -46,7 +46,7 @@
     <orderEntry type="module-library" exported="">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/Desktop/json_all-master/json_all-master/commons-logging.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../IntelliJIdeaFiles/ezmorph-1.0.2.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -55,7 +55,7 @@
     <orderEntry type="module-library" exported="">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/Desktop/json_all-master/json_all-master/json-lib-1.1-jdk13.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../IntelliJIdeaFiles/json-lib-1.1-jdk13.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -64,7 +64,7 @@
     <orderEntry type="module-library" exported="">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/Desktop/postgresql-42.2.8.jre6.jar!/" />
+          <root url="jar://$MODULE_DIR$/../../IntelliJIdeaFiles/postgresql-42.2.8.jre6.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />

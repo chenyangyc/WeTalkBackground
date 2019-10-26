@@ -33,13 +33,11 @@ public class HttpServer {
         myServer.begin();
     }
 
-
-
     //在此接受客户端的请求，并作响应
     private void begin() {
         String requestType;
         String requestPath;
-        String requestBody = "";
+        String requestBody;
         while(true){
             try {
                 //开始监听
@@ -47,18 +45,21 @@ public class HttpServer {
                 System.out.println("One client has connected to this server port: " + client.getLocalPort());
                 StringBuffer header = new StringBuffer();
                 StringBuffer body = new StringBuffer();
+                BufferedReader is = new BufferedReader(new InputStreamReader(client.getInputStream()));
 
-                Scanner scanner = new Scanner(System.in);
                 String httpHeader, httpRequest;
-                while(!(httpHeader = scanner.nextLine()).isEmpty()) {
+                while(!((httpHeader = is.readLine()).equals("^-^"))) {
+                    System.out.println(httpHeader);
                     header.append(httpHeader);
                 }
-                while(!(httpRequest = scanner.nextLine()).isEmpty()) {
+
+                while(!((httpRequest = is.readLine()).equals("^-^"))) {
+                    System.out.println(httpRequest);
                     body.append(httpRequest);
                 }
+
                 httpHeader = header.toString();
                 httpRequest = body.toString();
-
                 requestType = httpHeader.split(" ")[0];
                 requestPath = httpHeader.split(" ")[1].substring(1);
                 requestBody = httpRequest;
@@ -195,10 +196,11 @@ public class HttpServer {
 
     private void response(Socket client, String json) {
         try {
-            String result = commonMSG.replaceAll("%code", "200").replaceAll("%msg", "OK")
-                    .replaceAll("%type_body", json) + json;
+            String res = json + "\n";
+//            String result = commonMSG.replaceAll("%code", "200").replaceAll("%msg", "OK")
+//                    .replaceAll("%type_body", json) + json;
             OutputStream out = client.getOutputStream();
-            out.write(result.getBytes());
+            out.write(res.getBytes());
         } catch (IOException e) {
             e.printStackTrace();
         }
