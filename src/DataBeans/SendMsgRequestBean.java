@@ -7,6 +7,7 @@ public class SendMsgRequestBean extends CommonRequestBean implements JsonToObjec
     private String to, msg;
     private String userName;
     private int token;
+    private String time;
 
     public String getUserName() {
         return this.userName;
@@ -24,6 +25,8 @@ public class SendMsgRequestBean extends CommonRequestBean implements JsonToObjec
         return msg;
     }
 
+    public String getTime() { return time; }
+
     @Override
     public void convertFromJson(String jsonData) {
         JSONObject jsonObject = JSONObject.fromObject(jsonData);
@@ -31,5 +34,6 @@ public class SendMsgRequestBean extends CommonRequestBean implements JsonToObjec
         token = jsonObject.getInt("token");
         to = jsonObject.getString("to");
         msg = jsonObject.getString("msg");
+        time = jsonObject.getString("time");
     }
 }
