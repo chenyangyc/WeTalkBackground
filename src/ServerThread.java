@@ -1,5 +1,6 @@
 import DataBeans.*;
 
+import javax.swing.plaf.basic.BasicScrollPaneUI;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -7,25 +8,23 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 
 public class ServerThread implements Runnable {
 
-    private Map<Integer, Socket> userMap = new HashMap<>();
-    private Map<Integer, Socket> infoClientMap = new HashMap<>();
     private Connection connection;
     private Statement statement;
-    private Socket client;
-    private Socket infoClient;
+    Socket client;                     //发请求的客户端
+    Socket infoClient;
+    Socket msgClient;
     private String requestType;
     private String requestPath;
     private String requestBody;
     int id = 0;
 
-    ServerThread(Socket clientSocket, Socket infoClient){
+    ServerThread(Socket clientSocket, Socket infoClient, Socket msgClient){
         this.client = clientSocket;
         this.infoClient = infoClient;
+        this.msgClient = msgClient;
     }
 
     @Override
@@ -35,21 +34,9 @@ public class ServerThread implements Runnable {
                 //开始监听
                 initDatabase();
 
-//            Runnable run = () -> {
-//                while(true) {
-//                    sendInfos(infoClient, "{\n" +
-//                            "\"username\":\"test1\",  \"pwd\":\"000\"\n" +
-//                            "} \n");
-//                    try {
-//                        Thread.sleep(10);
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            };
-//            run.run();
-
                 System.out.println("One client has connected to this server port: " + client.getLocalPort());
+                System.out.println("connected?" + infoClient.getLocalPort());
+
                 StringBuffer header = new StringBuffer();
                 StringBuffer body = new StringBuffer();
                 BufferedReader is = new BufferedReader(new InputStreamReader(client.getInputStream()));
@@ -76,14 +63,14 @@ public class ServerThread implements Runnable {
                 System.out.println(requestPath);
                 System.out.println(requestBody);
                 if(requestType.equals("POST"))
-                    post(client, infoClient, requestPath, requestBody);
+                    post(client, infoClient, msgClient, requestPath, requestBody);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void post(Socket client, Socket infoClient, String path, String body){
+    private void post(Socket client, Socket infoClient, Socket msgClient, String path, String body){
         if(path.equals("login")) {
             LoginRequestBean loginRequestBean = new LoginRequestBean();
             LoginResponseBean responseBean = new LoginResponseBean();
@@ -95,7 +82,7 @@ public class ServerThread implements Runnable {
             responseBean.setType("login");
             if(c == 0) {
                 responseBean.setMsg("OK");
-                addOnlineUser(id, client, infoClient);  //添加这个socket
+                addOnlineUser(id, client, infoClient, msgClient);  //添加这个socket
             }
             else if(c == 1) responseBean.setMsg("密码错误");
             else if(c == -1) responseBean.setMsg("此用户尚未注册");
@@ -129,11 +116,6 @@ public class ServerThread implements Runnable {
             else if(c == -1)    logoutResponse.setMsg("用户不存在");
             System.out.println(logoutResponse.convertFromObject());
             response(client, logoutResponse.convertFromObject());
-//            try {
-//                client.close();
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
         }
         else if(path.equals("friends")) {
             CommonRequestBean friendRequest = new CommonRequestBean();
@@ -200,6 +182,22 @@ public class ServerThread implements Runnable {
             System.out.println(response.convertFromObject());
             response(client, response.convertFromObject());
         }
+
+        else if(path.equals("pictures")) {
+            SendMsgRequestBean request = new SendMsgRequestBean();
+            CommonResponseBean response = new CommonResponseBean();
+            request.convertFromJson(body);
+            int c = sendPicsToFriend(request.getUserName(), request.getTo(), request.getToken(), request.getMsg(), request.getTime());
+            response.setCode(c);
+            response.setType("pictures");
+            if(c == 0) response.setMsg("发送成功");
+            else if(c == -1) response.setMsg("没有这个用户");
+            else if(c == 1) response.setMsg("token无效");
+            else if(c == 2) response.setMsg("没有这个好友");
+            else if(c == -2) response.setMsg("当前用户不在线");
+            System.out.println(response.convertFromObject());
+            response(client, response.convertFromObject());
+        }
     }
 
     private void response(Socket client, String json) {
@@ -219,6 +217,7 @@ public class ServerThread implements Runnable {
             String res = json + "\n";
             OutputStream out = infoClient.getOutputStream();
             out.write(res.getBytes());
+//            out.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -282,8 +281,10 @@ public class ServerThread implements Runnable {
             } else return -1;   //查无此人
             statement.executeUpdate("UPDATE UserData SET isOnline = 0 WHERE userName = '"+userName+"'");
             System.out.println("User" + id + "offline");
-            userMap.remove(id);
-            infoClientMap.remove(id);
+
+            HttpServer.userMap.remove(id);
+            HttpServer.infoClientMap.remove(id);
+            HttpServer.msgClientMap.remove(id);
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -317,7 +318,7 @@ public class ServerThread implements Runnable {
                 if(resultSet1.next())   return 2;   //already friends
                 ResultSet resultSet2 = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+newFriend+"'");
                 if(resultSet2.next()) {
-                    Socket ss = infoClientMap.get(resultSet2.getInt(2));
+                    Socket ss = HttpServer.infoClientMap.get(resultSet2.getInt(2));
                     if(ss == null)  return -2;  //offline user
                     sendFriendResquest(ss, userName);
                     return 0;
@@ -335,7 +336,6 @@ public class ServerThread implements Runnable {
         makeFriendsResponse.setMsg("好友请求");
         makeFriendsResponse.setType("friendrequest");
         makeFriendsResponse.from = userName;
-//        response(s, makeFriendsResponse.convertFromObject());
         sendInfos(s, makeFriendsResponse.convertFromObject());
     }
 
@@ -348,7 +348,7 @@ public class ServerThread implements Runnable {
                 if(resultSet1.next())   return 2;
                 ResultSet resultSet2 = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+newFriend+"'");
                 if(resultSet2.next()) {
-                    Socket ss = infoClientMap.get(resultSet2.getInt(2));
+                    Socket ss = HttpServer.infoClientMap.get(resultSet2.getInt(2));
                     if(ss == null)  return -2;  //offline user
                     sendResquestRes(ss, userName, status);
                     return 0;
@@ -392,8 +392,7 @@ public class ServerThread implements Runnable {
                 if(resultSet1.next()) {
                     ResultSet resultSet2 = statement.executeQuery("SELECT ID FROM UserData WHERE userName = '"+to+"'");
                     resultSet2.first();
-//                    Socket ss = userMap.get(resultSet2.getInt(1));
-                    Socket ss = infoClientMap.get(resultSet2.getInt(1));
+                    Socket ss = HttpServer.msgClientMap.get(resultSet2.getInt(1));
                     if(ss == null)  return -2;  //offline user
                     sendTo(ss, userName, msg, time);
                     return 0;
@@ -416,11 +415,45 @@ public class ServerThread implements Runnable {
         sendInfos(clientSocket, response.convertFromObject());
     }
 
-    private void addOnlineUser(int id, Socket clientSocket, Socket infoClient) {
-        userMap.put(id, clientSocket);
-        infoClientMap.put(id, infoClient);
+    private int sendPicsToFriend(String userName, String to, int token, String msg, String time) {
+        try {
+            ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+userName+"'");
+            if(resultSet.next()) {
+                if(resultSet.getInt(5) != token)    return 1;  //wrong token
+
+                ResultSet resultSet1 = statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+to+"'");
+                if(resultSet1.next()) {
+                    ResultSet resultSet2 = statement.executeQuery("SELECT ID FROM UserData WHERE userName = '"+to+"'");
+                    resultSet2.first();
+                    Socket ss = HttpServer.msgClientMap.get(resultSet2.getInt(1));
+                    if(ss == null)  return -2;  //offline user
+                    sendPics(ss, userName, msg, time);
+                    return 0;
+                }else return 2;
+            }else return -1;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    private void sendPics(Socket clientSocket, String from, String msg, String time) {
+        MakeFriendsResponseBean response = new MakeFriendsResponseBean();
+        response.setCode(0);
+        response.setMsg(msg);
+        response.setType("pictures");
+        response.from = from;
+        response.time = time;
+        System.out.println(response.convertFromObject());
+        sendInfos(clientSocket, response.convertFromObject());
+    }
+
+    private void addOnlineUser(int id, Socket clientSocket, Socket infoClient, Socket msgClient) {
+        HttpServer.userMap.put(id, clientSocket);
+        HttpServer.infoClientMap.put(id, infoClient);
+        HttpServer.msgClientMap.put(id, msgClient);
         System.out.println("新登入用户id：" + id);
-        System.out.println("当前用户数量: " + userMap.size());
+        System.out.println("当前用户数量: " + HttpServer.userMap.size());
     }
 
     private void initDatabase(){
@@ -446,7 +479,7 @@ public class ServerThread implements Runnable {
 
             statement.executeUpdate(sqlUser);
             statement.executeUpdate(sqlRlsp);
-            statement.executeUpdate("UPDATE UserData SET isOnline = 0");
+//            statement.executeUpdate("UPDATE UserData SET isOnline = 0");
         }catch(Exception e){
             throw new RuntimeException(e);
         }

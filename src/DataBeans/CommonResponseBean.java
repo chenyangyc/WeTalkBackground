@@ -2,10 +2,11 @@ package DataBeans;
 
 import net.sf.json.JSONObject;
 
-public class CommonResponseBean extends Object {
-    protected int code;
-    protected String msg;
-    protected String type;
+public class CommonResponseBean {
+    private int code;
+    private String msg;
+    private String type;
+
     protected void convertToJson(){
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("code", code);

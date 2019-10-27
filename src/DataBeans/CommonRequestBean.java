@@ -2,7 +2,6 @@ package DataBeans;
 
 import net.sf.json.JSONObject;
 
-import javax.swing.*;
 
 public class CommonRequestBean implements JsonToObject {
     private String userName;

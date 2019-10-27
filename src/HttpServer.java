@@ -1,14 +1,25 @@
+import DataBeans.*;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
 
 public class HttpServer {
 
     ServerSocket server;               //本服务器
     ServerSocket infoServer;           // 处理消息轮询
+    ServerSocket msgServer;             // 处理消息监听
     Socket client;                     //发请求的客户端
     Socket infoClient;
+    Socket msgClient;
+    public static Map<Integer, Socket> userMap = new HashMap<>();
+    public static Map<Integer, Socket> infoClientMap = new HashMap<>();
+    public static Map<Integer, Socket> msgClientMap = new HashMap<>();
 
     String commonMSG = "HTTP/1.1 %code %msg\r\n" +
 						"Content-Type: application/json;charset=utf-8\r\n" +
@@ -19,6 +30,7 @@ public class HttpServer {
         try {
             this.server = new ServerSocket(12000);
             this.infoServer = new ServerSocket(12333);
+            this.msgServer = new ServerSocket(13000);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -39,12 +51,15 @@ public class HttpServer {
                 assert infoServer != null;
                 client = this.server.accept();
                 infoClient = this.infoServer.accept();
-                new Thread(new ServerThread(client, infoClient)).start();
+                msgClient = this.msgServer.accept();
+                new Thread(new ServerThread(client, infoClient, msgClient)).start();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
+
+
 }
 
 
