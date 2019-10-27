@@ -1,6 +1,5 @@
 import DataBeans.*;
 
-import javax.swing.plaf.basic.BasicScrollPaneUI;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -198,6 +197,17 @@ public class ServerThread implements Runnable {
             System.out.println(response.convertFromObject());
             response(client, response.convertFromObject());
         }
+
+        else if(path.equals("delete")) {
+            MakeFriendsRequestBean request = new MakeFriendsRequestBean();
+            CommonResponseBean response = new CommonResponseBean();
+            request.convertFromJson(body);
+            deleteFriends(request.getUserName(), request.getNewFriend());
+            response.setCode(0);
+            response.setType("delete");
+            response.setMsg("delete successfully");
+            response(client, response.convertFromObject());
+        }
     }
 
     private void response(Socket client, String json) {
@@ -382,6 +392,15 @@ public class ServerThread implements Runnable {
         }
     }
 
+    private void deleteFriends(String from, String to) {
+        try {
+            statement.executeUpdate("DELETE FROM UserFriends WHERE username = '"+from+"' AND friendname = '"+to+"'");
+            statement.executeUpdate("DELET    E FROM UserFriends WHERE username = '"+to+"' AND friendname = '"+from+"'");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     private int sendToFriend(String userName, String to, int token, String msg, String time) {
         try {
             ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+userName+"'");
@@ -456,6 +475,7 @@ public class ServerThread implements Runnable {
         System.out.println("当前用户数量: " + HttpServer.userMap.size());
     }
 
+
     private void initDatabase(){
         try{
             String url="jdbc:postgresql://127.0.0.1:5432/postgres";
@@ -479,7 +499,7 @@ public class ServerThread implements Runnable {
 
             statement.executeUpdate(sqlUser);
             statement.executeUpdate(sqlRlsp);
-//            statement.executeUpdate("UPDATE UserData SET isOnline = 0");
+            statement.executeUpdate("UPDATE UserData SET isOnline = 0");
         }catch(Exception e){
             throw new RuntimeException(e);
         }
