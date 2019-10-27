@@ -10,8 +10,7 @@ import java.util.ArrayList;
 
 public class ServerThread implements Runnable {
 
-    private Connection connection;
-    private Statement statement;
+
     Socket client;                     //发请求的客户端
     Socket infoClient;
     Socket msgClient;
@@ -31,7 +30,7 @@ public class ServerThread implements Runnable {
         while(true) {
             try {
                 //开始监听
-                initDatabase();
+//                initDatabase();
 
                 System.out.println("One client has connected to this server port: " + client.getLocalPort());
                 System.out.println("connected?" + infoClient.getLocalPort());
@@ -236,13 +235,13 @@ public class ServerThread implements Runnable {
     private int regist(String userName, String pwd) {
         String sql = "SELECT * FROM UserData WHERE userdata.username = '"+userName+"'";
         try {
-            ResultSet resultSet = statement.executeQuery(sql);
+            ResultSet resultSet = HttpServer.statement.executeQuery(sql);
             if(resultSet.next())    return -1;  // 已注册，冲突
             else {
-                resultSet = statement.executeQuery("SELECT max(ID) FROM UserData");
+                resultSet = HttpServer.statement.executeQuery("SELECT max(ID) FROM UserData");
                 resultSet.first();
                 id = resultSet.getInt(1) + 1;
-                statement.executeUpdate("INSERT INTO UserData VALUES('"+userName+"', '"+id+"', '"+pwd+"',0,0)");
+                HttpServer.statement.executeUpdate("INSERT INTO UserData VALUES('"+userName+"', '"+id+"', '"+pwd+"',0,0)");
                 return 0;
             }
         } catch (SQLException e) {
@@ -255,7 +254,7 @@ public class ServerThread implements Runnable {
     private Tuple login(String userName, String pwd, int token) {
         String sql = "SELECT * FROM UserData WHERE userdata.username = '"+userName+"'";
         try {
-            ResultSet resultSet = statement.executeQuery(sql);
+            ResultSet resultSet = HttpServer.statement.executeQuery(sql);
             if(resultSet.next()) {
                 if(!resultSet.getString(3).trim().equals(pwd))
                     return new Tuple(1,0);
@@ -263,13 +262,13 @@ public class ServerThread implements Runnable {
                     id = resultSet.getInt(2);
                     token = (int)(Math.random() * 100);
                     String loginSql = "UPDATE UserData SET isOnline = 1, token = '"+token+"' WHERE userName = '"+userName+"'";
-                    statement.executeUpdate(loginSql);
+                    HttpServer.statement.executeUpdate(loginSql);
                     return new Tuple(2, token);
                 } else {
                     id = resultSet.getInt(2);
                     token = (int)(Math.random() * 100);
                     String loginSql = "UPDATE UserData SET isOnline = 1, token = '"+token+"' WHERE userName = '"+userName+"'";
-                    statement.executeUpdate(loginSql);
+                    HttpServer.statement.executeUpdate(loginSql);
                     return new Tuple(0, token);
                 }
             } else  return new Tuple(-1, token);
@@ -283,13 +282,13 @@ public class ServerThread implements Runnable {
         int id;
         String sql = "SELECT * FROM UserData WHERE userdata.username = '"+userName+"'";
         try {
-            ResultSet resultSet = statement.executeQuery(sql);
+            ResultSet resultSet = HttpServer.statement.executeQuery(sql);
             if (resultSet.next()) {
                 if(resultSet.getInt(4) == 0)    return 1;   //已经离线
                 else if(resultSet.getInt(5) != token)   return 2;   //token conflicts
                 id = resultSet.getInt(2);
             } else return -1;   //查无此人
-            statement.executeUpdate("UPDATE UserData SET isOnline = 0 WHERE userName = '"+userName+"'");
+            HttpServer.statement.executeUpdate("UPDATE UserData SET isOnline = 0 WHERE userName = '"+userName+"'");
             System.out.println("User" + id + "offline");
 
             HttpServer.userMap.remove(id);
@@ -304,10 +303,10 @@ public class ServerThread implements Runnable {
     private Tuple getFriends(String userName, int token) {
         try {
             ArrayList<String> friendsList = new ArrayList<>();
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userdata.username = '"+userName+"'");
+            ResultSet resultSet = HttpServer.statement.executeQuery("SELECT * FROM UserData WHERE userdata.username = '"+userName+"'");
             if(resultSet.next()) {
                 if(resultSet.getInt(5) != token)    return new Tuple(1, friendsList);  //wrong token
-                ResultSet resultSet1 = statement.executeQuery("SELECT friendName FROM UserFriends WHERE userName = '"+userName+"'");
+                ResultSet resultSet1 = HttpServer.statement.executeQuery("SELECT friendName FROM UserFriends WHERE userName = '"+userName+"'");
                 while (resultSet1.next()) {
                     friendsList.add(resultSet1.getString(1));
                 }
@@ -321,12 +320,12 @@ public class ServerThread implements Runnable {
 
     private int makeFriends(String userName, String newFriend, int token){
         try {
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userdata.userName = '"+userName+"'");
+            ResultSet resultSet = HttpServer.statement.executeQuery("SELECT * FROM UserData WHERE userdata.userName = '"+userName+"'");
             if(resultSet.next()) {
                 if(resultSet.getInt(5) != token)    return 1;  //wrong token
-                ResultSet resultSet1 = statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+newFriend+"'");
+                ResultSet resultSet1 = HttpServer.statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+newFriend+"'");
                 if(resultSet1.next())   return 2;   //already friends
-                ResultSet resultSet2 = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+newFriend+"'");
+                ResultSet resultSet2 = HttpServer.statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+newFriend+"'");
                 if(resultSet2.next()) {
                     Socket ss = HttpServer.infoClientMap.get(resultSet2.getInt(2));
                     if(ss == null)  return -2;  //offline user
@@ -351,12 +350,12 @@ public class ServerThread implements Runnable {
 
     private int makeFriendsCheck(String userName, String newFriend, int token, int status) {
         try {
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+userName+"'");
+            ResultSet resultSet = HttpServer.statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+userName+"'");
             if(resultSet.next()) {
                 if(resultSet.getInt(5) != token)    return 1;  //wrong token
-                ResultSet resultSet1 = statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+newFriend+"'");
+                ResultSet resultSet1 = HttpServer.statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+newFriend+"'");
                 if(resultSet1.next())   return 2;
-                ResultSet resultSet2 = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+newFriend+"'");
+                ResultSet resultSet2 = HttpServer.statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+newFriend+"'");
                 if(resultSet2.next()) {
                     Socket ss = HttpServer.infoClientMap.get(resultSet2.getInt(2));
                     if(ss == null)  return -2;  //offline user
@@ -382,11 +381,11 @@ public class ServerThread implements Runnable {
 
     private void addFriend(String from, String to) {
         try {
-            ResultSet resultSet = statement.executeQuery("SELECT MAX(id) FROM UserFriends");
+            ResultSet resultSet = HttpServer.statement.executeQuery("SELECT MAX(id) FROM UserFriends");
             resultSet.first();
             int id = resultSet.getInt(1);
-            statement.executeUpdate("INSERT INTO UserFriends VALUES('"+from+"','"+to+"','"+id + 1 +"')");
-            statement.executeUpdate("INSERT INTO UserFriends VALUES('"+to+"','"+from+"','"+id + 2 +"')");
+            HttpServer.statement.executeUpdate("INSERT INTO UserFriends VALUES('"+from+"','"+to+"','"+id + 1 +"')");
+            HttpServer.statement.executeUpdate("INSERT INTO UserFriends VALUES('"+to+"','"+from+"','"+id + 2 +"')");
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -394,8 +393,8 @@ public class ServerThread implements Runnable {
 
     private void deleteFriends(String from, String to) {
         try {
-            statement.executeUpdate("DELETE FROM UserFriends WHERE username = '"+from+"' AND friendname = '"+to+"'");
-            statement.executeUpdate("DELET    E FROM UserFriends WHERE username = '"+to+"' AND friendname = '"+from+"'");
+            HttpServer.statement.executeUpdate("DELETE FROM UserFriends WHERE username = '"+from+"' AND friendname = '"+to+"'");
+            HttpServer.statement.executeUpdate("DELET    E FROM UserFriends WHERE username = '"+to+"' AND friendname = '"+from+"'");
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -403,13 +402,13 @@ public class ServerThread implements Runnable {
 
     private int sendToFriend(String userName, String to, int token, String msg, String time) {
         try {
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+userName+"'");
+            ResultSet resultSet = HttpServer.statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+userName+"'");
             if(resultSet.next()) {
                 if(resultSet.getInt(5) != token)    return 1;  //wrong token
 
-                ResultSet resultSet1 = statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+to+"'");
+                ResultSet resultSet1 = HttpServer.statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+to+"'");
                 if(resultSet1.next()) {
-                    ResultSet resultSet2 = statement.executeQuery("SELECT ID FROM UserData WHERE userName = '"+to+"'");
+                    ResultSet resultSet2 = HttpServer.statement.executeQuery("SELECT ID FROM UserData WHERE userName = '"+to+"'");
                     resultSet2.first();
                     Socket ss = HttpServer.msgClientMap.get(resultSet2.getInt(1));
                     if(ss == null)  return -2;  //offline user
@@ -436,13 +435,13 @@ public class ServerThread implements Runnable {
 
     private int sendPicsToFriend(String userName, String to, int token, String msg, String time) {
         try {
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+userName+"'");
+            ResultSet resultSet = HttpServer.statement.executeQuery("SELECT * FROM UserData WHERE userName = '"+userName+"'");
             if(resultSet.next()) {
                 if(resultSet.getInt(5) != token)    return 1;  //wrong token
 
-                ResultSet resultSet1 = statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+to+"'");
+                ResultSet resultSet1 = HttpServer.statement.executeQuery("SELECT * FROM UserFriends WHERE userName = '"+userName+"' AND friendName = '"+to+"'");
                 if(resultSet1.next()) {
-                    ResultSet resultSet2 = statement.executeQuery("SELECT ID FROM UserData WHERE userName = '"+to+"'");
+                    ResultSet resultSet2 = HttpServer.statement.executeQuery("SELECT ID FROM UserData WHERE userName = '"+to+"'");
                     resultSet2.first();
                     Socket ss = HttpServer.msgClientMap.get(resultSet2.getInt(1));
                     if(ss == null)  return -2;  //offline user
@@ -476,32 +475,32 @@ public class ServerThread implements Runnable {
     }
 
 
-    private void initDatabase(){
-        try{
-            String url="jdbc:postgresql://127.0.0.1:5432/postgres";
-            String user="postgres";
-            String password = "yc010106";
-            Class.forName("org.postgresql.Driver");
-            connection= DriverManager.getConnection(url, user, password);
-            System.out.println("是否成功连接pg数据库" + connection);
-
-            statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
-            String sqlUser = "CREATE TABLE IF NOT EXISTS UserData" + //用户信息表
-                    "(userName CHAR(20) PRIMARY KEY," +
-                    "ID INTEGER," +
-                    "passWord CHAR(20)," +
-                    "isOnline INTEGER," +
-                    "token INTEGER)";
-            String sqlRlsp = "CREATE TABLE IF NOT EXISTS UserFriends" +//好友关系表
-                    "(userName CHAR(20)," +
-                    "friendName CHAR(20)," +
-                    "ID INTEGER PRIMARY KEY)";
-
-            statement.executeUpdate(sqlUser);
-            statement.executeUpdate(sqlRlsp);
-            statement.executeUpdate("UPDATE UserData SET isOnline = 0");
-        }catch(Exception e){
-            throw new RuntimeException(e);
-        }
-    }
+//    private void initDatabase(){
+//        try{
+//            String url="jdbc:postgresql://127.0.0.1:5432/postgres";
+//            String user="postgres";
+//            String password = "your code";
+//            Class.forName("org.postgresql.Driver");
+//            HttpServer.connection= DriverManager.getConnection(url, user, password);
+//            System.out.println("是否成功连接pg数据库" + HttpServer.connection);
+//
+//            HttpServer.statement = HttpServer.connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
+//            String sqlUser = "CREATE TABLE IF NOT EXISTS UserData" + //用户信息表
+//                    "(userName CHAR(20) PRIMARY KEY," +
+//                    "ID INTEGER," +
+//                    "passWord CHAR(20)," +
+//                    "isOnline INTEGER," +
+//                    "token INTEGER)";
+//            String sqlRlsp = "CREATE TABLE IF NOT EXISTS UserFriends" +//好友关系表
+//                    "(userName CHAR(20)," +
+//                    "friendName CHAR(20)," +
+//                    "ID INTEGER PRIMARY KEY)";
+//
+//            HttpServer.statement.executeUpdate(sqlUser);
+//            HttpServer.statement.executeUpdate(sqlRlsp);
+//            HttpServer.statement.executeUpdate("UPDATE UserData SET isOnline = 0");
+//        }catch(Exception e){
+//            throw new RuntimeException(e);
+//        }
+//    }
 }
